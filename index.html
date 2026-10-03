@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Common Thread — DNA Sequence Comparison with LCS & Dynamic Programming</title>
+  <meta name="description" content="Compare DNA strings, find their longest common subsequence, see similarity measures and walk through the dynamic-programming table that produced the answer." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,800&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/styles.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%2316181d'/><text x='16' y='22' font-family='monospace' font-size='16' font-weight='700' text-anchor='middle' fill='%23f3efe6'>λ</text></svg>" />
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#top"><span class="brand-mark">⟜</span> Common&nbsp;Thread</a>
+    <nav>
+      <a href="#compare">Compare</a>
+      <a href="#table">DP table</a>
+      <a href="#algorithms">Algorithms</a>
+      <a href="#python">Python · Biopython</a>
+      <a href="#theory">How it works</a>
+    </nav>
+  </header>
+
+  <main id="top">
+    <section class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow">DNA sequence comparison · Design &amp; Analysis of Algorithms</p>
+        <h1>Find the thread<br/>two genomes <em>share</em>.</h1>
+        <p class="lede">Paste two DNA strings. Common Thread computes their <strong>Longest Common Subsequence</strong> with dynamic programming, scores how similar they are, and walks you cell-by-cell through the table that proves the answer.</p>
+        <div class="hero-cta">
+          <a class="btn primary" href="#compare">Compare sequences</a>
+          <a class="btn ghost" href="#table">Watch the DP table fill</a>
+        </div>
+      </div>
+      <div class="hero-strand" aria-hidden="true" id="heroStrand"></div>
+    </section>
+
+    <!-- ================= INPUT + RESULTS ================= -->
+    <section id="compare" class="section">
+      <div class="section-head">
+        <span class="step">01</span>
+        <div>
+          <h2>Compare two sequences</h2>
+          <p>Plain text or FASTA. Letters other than A, C, G, T, U, N are ignored. Results update as you type.</p>
+        </div>
+      </div>
+
+      <div class="samples">
+        <span>Try a sample:</span>
+        <button class="chip" data-sample="short">Short pair</button>
+        <button class="chip" data-sample="mutation">Point mutation + insertion</button>
+        <button class="chip" data-sample="clrs">CLRS textbook strands</button>
+        <button class="chip" data-sample="globin">Globin-like fragments</button>
+        <button class="chip" data-sample="random">Random pair</button>
+      </div>
+
+      <div class="inputs">
+        <label class="seq-input">
+          <span class="seq-label"><b class="tag tag-a">A</b> Sequence A <small id="lenA"></small></span>
+          <textarea id="seqA" spellcheck="false" rows="4"></textarea>
+          <span class="warn" id="warnA"></span>
+        </label>
+        <button class="swap" id="swapBtn" title="Swap sequences" aria-label="Swap sequences">⇅</button>
+        <label class="seq-input">
+          <span class="seq-label"><b class="tag tag-b">B</b> Sequence B <small id="lenB"></small></span>
+          <textarea id="seqB" spellcheck="false" rows="4"></textarea>
+          <span class="warn" id="warnB"></span>
+        </label>
+      </div>
+
+      <div class="result-card">
+        <div class="lcs-head">
+          <div>
+            <p class="kicker">Longest common subsequence</p>
+            <div class="lcs-value" id="lcsValue"></div>
+          </div>
+          <div class="lcs-len">
+            <span id="lcsLen">0</span>
+            <small>nucleotides shared<br/>in the same order</small>
+          </div>
+        </div>
+
+        <p class="kicker">Where the subsequence sits in each strand</p>
+        <div class="alignment" id="alignment"></div>
+        <p class="hint">Matched bases are highlighted; dashes mark bases that one strand has and the other skips. This is the LCS alignment: indels only, no substitutions.</p>
+
+        <div class="metrics" id="metrics"></div>
+
+        <details class="all-lcs" id="allLcsWrap">
+          <summary>Other optimal subsequences of the same length <span id="allLcsCount"></span></summary>
+          <div id="allLcs"></div>
+        </details>
+      </div>
+    </section>
+
+    <!-- ================= DP TABLE ================= -->
+    <section id="table" class="section">
+      <div class="section-head">
+        <span class="step">02</span>
+        <div>
+          <h2>The dynamic-programming table</h2>
+          <p>Each cell <code>dp[i][j]</code> stores the LCS length of the first <i>i</i> bases of A and the first <i>j</i> bases of B. Hover a cell to see why it holds its value. Click a cell to trace back the LCS of those two prefixes.</p>
+        </div>
+      </div>
+
+      <div class="recurrence">
+        <div class="formula">
+          <span class="f-lhs">dp[i][j] =</span>
+          <span class="f-cases">
+            <span><b>0</b><em>if i = 0 or j = 0</em></span>
+            <span><b>dp[i−1][j−1] + 1</b><em>if A<sub>i</sub> = B<sub>j</sub> &nbsp;↖</em></span>
+            <span><b>max(dp[i−1][j], dp[i][j−1])</b><em>otherwise &nbsp;↑ / ←</em></span>
+          </span>
+        </div>
+      </div>
+
+      <div class="table-controls">
+        <button class="btn small" id="playBtn">▶ Animate fill</button>
+        <button class="btn small ghost" id="stepBtn">Step</button>
+        <button class="btn small ghost" id="traceBtn">Animate traceback</button>
+        <button class="btn small ghost" id="resetBtn">Show full table</button>
+        <label class="speed">Speed <input type="range" id="speed" min="1" max="10" value="6" /></label>
+        <label class="toggle"><input type="checkbox" id="showArrows" checked /> Arrows</label>
+        <label class="toggle"><input type="checkbox" id="showPath" checked /> Traceback path</label>
+      </div>
+
+      <div class="table-layout">
+        <div class="table-scroll" id="tableScroll"></div>
+        <aside class="inspector" id="inspector">
+          <p class="kicker">Cell inspector</p>
+          <div id="inspectorBody"><p class="muted">Hover any cell in the table.</p></div>
+          <hr/>
+          <p class="kicker">Legend</p>
+          <ul class="legend">
+            <li><span class="sw sw-path"></span> on the traceback path</li>
+            <li><span class="sw sw-match"></span> match taken (base added to LCS)</li>
+            <li><span class="sw sw-dep"></span> cells this value depends on</li>
+            <li><span class="ar-demo">↖</span> diagonal (match) · <span class="ar-demo">↑</span> drop A<sub>i</sub> · <span class="ar-demo">←</span> drop B<sub>j</sub></li>
+          </ul>
+        </aside>
+      </div>
+      <p class="hint" id="tableNote"></p>
+    </section>
+
+    <!-- ================= ALGORITHMS ================= -->
+    <section id="algorithms" class="section">
+      <div class="section-head">
+        <span class="step">03</span>
+        <div>
+          <h2>Four ways to compute the same answer</h2>
+          <p>All four approaches use the same recurrence. They differ in how often they re-solve the same subproblem and how much memory they keep. Counts are measured live on your sequences.</p>
+        </div>
+      </div>
+      <div class="algo-grid" id="algoGrid"></div>
+      <div class="ops-chart">
+        <p class="kicker">Subproblem evaluations (log scale)</p>
+        <div id="opsChart"></div>
+      </div>
+    </section>
+
+    <!-- ================= PYTHON ================= -->
+    <section id="python" class="section">
+      <div class="section-head">
+        <span class="step">04</span>
+        <div>
+          <h2>Run the Python engine with Biopython</h2>
+          <p>The same algorithms are written in Python (<a href="/py/lcs_core.py" target="_blank" rel="noopener">lcs_core.py</a>) and run in your browser on a Pyodide Python runtime. Biopython adds a scored global alignment (<code>Bio.Align.PairwiseAligner</code>) for comparison with the LCS result. The repository also includes a Streamlit app built on the same module.</p>
+        </div>
+      </div>
+      <div class="py-card">
+        <div class="py-bar">
+          <button class="btn primary" id="pyBtn">Run in Python + Biopython</button>
+          <span class="py-status" id="pyStatus">First run downloads the Python runtime (~10 MB). After that, runs are instant.</span>
+        </div>
+        <div id="pyOut" class="py-out"></div>
+      </div>
+    </section>
+
+    <!-- ================= THEORY ================= -->
+    <section id="theory" class="section theory">
+      <div class="section-head">
+        <span class="step">05</span>
+        <div><h2>How the dynamic program works</h2></div>
+      </div>
+      <div class="theory-grid">
+        <article>
+          <h3>1 · Subsequence, not substring</h3>
+          <p>A subsequence keeps the order of the bases but can skip some. <code>GTA</code> is a subsequence of <code>GATTACA</code>. In biology this models conserved bases that survive insertions and deletions.</p>
+        </article>
+        <article>
+          <h3>2 · Optimal substructure</h3>
+          <p>Look at the last bases of the two prefixes. If they match, they can end the LCS, so the answer is the LCS of both shorter prefixes plus one. If they don't match, at least one of them is not in the LCS, so drop either one and keep the better result.</p>
+        </article>
+        <article>
+          <h3>3 · Overlapping subproblems</h3>
+          <p>Plain recursion reaches the same pair <code>(i, j)</code> through many different branches, and the work grows exponentially. There are only <code>(m+1)(n+1)</code> distinct pairs, so storing each result once brings the cost down to <code>O(m·n)</code>.</p>
+        </article>
+        <article>
+          <h3>4 · Reconstruct from stored states</h3>
+          <p>The table holds lengths, not strings. To recover the subsequence, start at <code>dp[m][n]</code> and follow the decision that produced each value: diagonal on a match (emit that base), otherwise up or left toward the larger neighbour, until you reach a zero edge.</p>
+        </article>
+        <article>
+          <h3>5 · Similarity measures</h3>
+          <p><b>LCS similarity</b> = 2·L / (m + n). <b>Coverage</b> = L divided by each sequence's length. <b>Edit distance</b> is a second DP (Levenshtein) that counts insertions, deletions and substitutions. <b>Hamming</b> counts mismatched positions when the lengths are equal.</p>
+        </article>
+        <article>
+          <h3>6 · LCS vs. scored alignment</h3>
+          <p>LCS rewards matches only. Biopython's global aligner (Needleman–Wunsch style) also scores mismatches and gaps, and it fills its own DP matrix with the same grid-and-traceback idea.</p>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <p>Common Thread · Longest Common Subsequence by dynamic programming · Python · Biopython · Streamlit edition in <code>/streamlit</code></p>
+  </footer>
+
+  <script src="/app.js" type="module"></script>
+<script async src="/.netlify/scripts/ar" data-netlify-deploy-id="6ac0884c7c75c3c0fa79f91e" data-netlify-site-id="cb6d2db4-7260-4fbb-8c37-b43d43d3392e" data-agent-runner-id="6ac08687e290a89035c47aab"></script>
+</body>
+</html>
